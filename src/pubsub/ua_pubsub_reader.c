@@ -19,8 +19,6 @@
 
 #ifdef UA_ENABLE_PUBSUB_INFORMATIONMODEL
 #include "ua_pubsub_ns0.h"
-#include "ua_pubsub_networkmessage.h"
-
 #endif
 
 #ifdef UA_ENABLE_PUBSUB_DELTAFRAMES
@@ -246,27 +244,9 @@ UA_DataSetReader_generateNetworkMessage(UA_PubSubConnection *pubSubConnection, U
     networkMessage->version = 1;
     networkMessage->networkMessageType = UA_NETWORKMESSAGE_DATASET;
     if(UA_DataType_isNumeric(dataSetReader->config.publisherId.type)) {
-        switch(dataSetReader->config.publisherId.type->typeIndex){
-            case UA_DATATYPEKIND_BYTE:
-                networkMessage->publisherIdType = UA_PUBLISHERDATATYPE_BYTE;
-                networkMessage->publisherId.publisherIdByte = *(UA_Byte *) dataSetReader->config.publisherId.data;
-                break;
-
-            case UA_DATATYPEKIND_UINT16:
-                networkMessage->publisherIdType = UA_PUBLISHERDATATYPE_UINT16;
-                networkMessage->publisherId.publisherIdUInt16 = *(UA_UInt16 *) dataSetReader->config.publisherId.data;
-                break;
-
-            case UA_DATATYPEKIND_UINT32:
-                networkMessage->publisherIdType = UA_PUBLISHERDATATYPE_UINT32;
-                networkMessage->publisherId.publisherIdUInt32 = *(UA_UInt32 *) dataSetReader->config.publisherId.data;
-                break;
-
-            case UA_DATATYPEKIND_UINT64:
-                networkMessage->publisherIdType = UA_PUBLISHERDATATYPE_UINT64;
-                networkMessage->publisherId.publisherIdUInt64 = *(UA_UInt64 *) dataSetReader->config.publisherId.data;
-                break;
-        }
+        /* TODO Support all numeric types */
+        networkMessage->publisherIdType = UA_PUBLISHERDATATYPE_UINT16;
+        networkMessage->publisherId.publisherIdUInt16 = *(UA_UInt16 *) dataSetReader->config.publisherId.data;
     } else {
         return UA_STATUSCODE_BADNOTSUPPORTED;
     }
@@ -935,8 +915,8 @@ void UA_ReaderGroup_subscribeCallback(UA_Server *server, UA_ReaderGroup *readerG
                     return;
                 }
 
-                UA_DataSetReader_process(server, dataSetReader,
-                                         dataSetReader->bufferedMessage.nm->payload.dataSetPayload.dataSetMessages);
+                UA_Server_DataSetReader_process(server, dataSetReader,
+                                                dataSetReader->bufferedMessage.nm->payload.dataSetPayload.dataSetMessages);
 
                 /* Delete the payload value of every dsf's decoded */
                 UA_DataSetMessage *dsm = dataSetReader->bufferedMessage.nm->payload.dataSetPayload.dataSetMessages;
@@ -962,7 +942,6 @@ void UA_ReaderGroup_subscribeCallback(UA_Server *server, UA_ReaderGroup *readerG
 
                 previousPosition = currentPosition;
             } while((buffer.length) > currentPosition);
-
             UA_ByteString_clear(&buffer);
             return;
 
@@ -973,9 +952,7 @@ void UA_ReaderGroup_subscribeCallback(UA_Server *server, UA_ReaderGroup *readerG
                 UA_NetworkMessage currentNetworkMessage;
                 memset(&currentNetworkMessage, 0, sizeof(UA_NetworkMessage));
                 UA_NetworkMessage_decodeBinary(&buffer, &currentPosition, &currentNetworkMessage);
-                /* TODO: We already know the ReaderGroup at this point. Now we loose that information.
-                 * There is only one place where UA_PubSubConnection_processNetworkMessage is used. */
-                UA_PubSubConnection_processNetworkMessage(server, connection, &currentNetworkMessage);
+                UA_Server_processNetworkMessage(server, &currentNetworkMessage, connection);
                 UA_NetworkMessage_clear(&currentNetworkMessage);
 
                 /* Minimum ethernet packet size is 64 bytes where the header size is 14 bytes and FCS size is 4 bytes
@@ -991,7 +968,6 @@ void UA_ReaderGroup_subscribeCallback(UA_Server *server, UA_ReaderGroup *readerG
             } while((buffer.length) > currentPosition);
         }
     }
-
     UA_ByteString_clear(&buffer);
 }
 
@@ -1549,10 +1525,11 @@ UA_Server_DataSetReader_createDataSetMirror(UA_Server *server, UA_String *parent
 }*/
 
 void
-UA_DataSetReader_process(UA_Server *server, UA_DataSetReader *dataSetReader,
-                         UA_DataSetMessage* dataSetMsg) {
-    if(!dataSetReader || !dataSetMsg || !server)
+UA_Server_DataSetReader_process(UA_Server *server, UA_DataSetReader *dataSetReader,
+                                UA_DataSetMessage* dataSetMsg) {
+    if((dataSetReader == NULL) || (dataSetMsg == NULL) || (server == NULL)) {
         return;
+    }
 
     if(!dataSetMsg->header.dataSetMessageValid) {
         UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER,
@@ -1762,8 +1739,8 @@ UA_DataSetReader_clear(UA_Server *server, UA_DataSetReader *dataSetReader) {
 }
 
 UA_StatusCode
-UA_PubSubConnection_processNetworkMessage(UA_Server *server, UA_PubSubConnection *pConnection,
-                                          UA_NetworkMessage* pMsg) {
+UA_Server_processNetworkMessage(UA_Server *server, UA_NetworkMessage *pMsg,
+                                UA_PubSubConnection *pConnection) {
     UA_StatusCode retval = UA_STATUSCODE_GOOD;
     if(!pMsg || !pConnection)
         return UA_STATUSCODE_BADINVALIDARGUMENT;
@@ -1786,8 +1763,8 @@ UA_PubSubConnection_processNetworkMessage(UA_Server *server, UA_PubSubConnection
         anzDataSets = pMsg->payloadHeader.dataSetPayloadHeader.count;
     for(UA_Byte iterator = 0; iterator < anzDataSets; iterator++) {
         UA_LOG_DEBUG(&server->config.logger, UA_LOGCATEGORY_SERVER, "Process Msg with DataSetReader!");
-        UA_DataSetReader_process(server, dataSetReader,
-                                 &pMsg->payload.dataSetPayload.dataSetMessages[iterator]);
+        UA_Server_DataSetReader_process(server, dataSetReader,
+                                        &pMsg->payload.dataSetPayload.dataSetMessages[iterator]);
     }
 
     for(int i = 0; i < pMsg->payloadHeader.dataSetPayloadHeader.count; ++i) {
