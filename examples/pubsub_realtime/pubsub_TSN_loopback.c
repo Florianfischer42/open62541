@@ -33,7 +33,7 @@
  *
  * ./bin/examples/pubsub_TSN_loopback -interface <interface>
  *
- * For more options, run ./bin/examples/pubsub_TSN_loopback -h
+ * For more options, run ./bin/examples/pubsub_TSN_loopback -help
  */
 
 /**
@@ -79,10 +79,8 @@
 #include <open62541/types_generated.h>
 #include <open62541/plugin/pubsub_ethernet.h>
 
-#if defined (UA_ENABLE_PUBSUB_ETH_UADP_XDP)
 #include <linux/if_link.h>
-#include <open62541/plugin/pubsub_ethernet_xdp.h>
-#endif
+#include <linux/if_xdp.h>
 
 #include "ua_pubsub.h"
 
@@ -119,8 +117,8 @@ UA_DataSetReaderConfig readerConfig;
 #endif
 #define             REPEATED_NODECOUNTS                   2    // Default to publish 64 bytes
 #define             PORT_NUMBER                           62541
-#define             RECEIVE_QUEUE                         2
-#define             XDP_FLAG                              XDP_FLAGS_SKB_MODE
+#define             DEFAULT_XDP_QUEUE                     2
+#define             PUBSUB_CONFIG_RT_INFORMATION_MODEL
 
 /* Non-Configurable Parameters */
 /* Milli sec and sec conversion to nano sec */
@@ -170,11 +168,15 @@ static UA_Int32   pubCore              = DEFAULT_PUB_CORE;
 static UA_Int32   subCore              = DEFAULT_SUB_CORE;
 static UA_Int32   userAppCore          = DEFAULT_USER_APP_CORE;
 static UA_Int32   qbvOffset            = DEFAULT_QBV_OFFSET;
+static UA_UInt32  xdpQueue             = DEFAULT_XDP_QUEUE;
+static UA_UInt32  xdpFlag              = XDP_FLAGS_SKB_MODE;
+static UA_UInt32  xdpBindFlag          = XDP_COPY;
 static UA_Boolean disableSoTxtime      = UA_TRUE;
 static UA_Boolean enableCsvLog         = UA_FALSE;
 static UA_Boolean consolePrint         = UA_FALSE;
 static UA_Boolean enableBlockingSocket = UA_FALSE;
 static UA_Boolean signalTerm           = UA_FALSE;
+static UA_Boolean enableXdpSubscribe   = UA_FALSE;
 
 /* Variables corresponding to PubSub connection creation,
  * published data set and writer group */
@@ -399,17 +401,23 @@ addPubSubConnectionSubscriber(UA_Server *server, UA_NetworkAddressUrlDataType *n
     memset(&connectionConfig, 0, sizeof(connectionConfig));
     connectionConfig.name                                   = UA_STRING("Subscriber Connection");
     connectionConfig.enabled                                = UA_TRUE;
-#if defined (UA_ENABLE_PUBSUB_ETH_UADP_XDP)
-    UA_KeyValuePair connectionOptions[2];
-    connectionOptions[0].key                  = UA_QUALIFIEDNAME(0, "xdpflag");
-    UA_UInt32 flags                           = XDP_FLAG;
-    UA_Variant_setScalar(&connectionOptions[0].value, &flags, &UA_TYPES[UA_TYPES_UINT32]);
-    connectionOptions[1].key                  = UA_QUALIFIEDNAME(0, "hwreceivequeue");
-    UA_UInt32 rxqueue                         = RECEIVE_QUEUE;
-    UA_Variant_setScalar(&connectionOptions[1].value, &rxqueue, &UA_TYPES[UA_TYPES_UINT32]);
+
+    UA_KeyValuePair connectionOptions[4];
+    connectionOptions[0].key                  = UA_QUALIFIEDNAME(0, "enableXdpSocket");
+    UA_Boolean enableXdp                      = enableXdpSubscribe;
+    UA_Variant_setScalar(&connectionOptions[0].value, &enableXdp, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    connectionOptions[1].key                  = UA_QUALIFIEDNAME(0, "xdpflag");
+    UA_UInt32 flags                           = xdpFlag;
+    UA_Variant_setScalar(&connectionOptions[1].value, &flags, &UA_TYPES[UA_TYPES_UINT32]);
+    connectionOptions[2].key                  = UA_QUALIFIEDNAME(0, "hwreceivequeue");
+    UA_UInt32 rxqueue                         = xdpQueue;
+    UA_Variant_setScalar(&connectionOptions[2].value, &rxqueue, &UA_TYPES[UA_TYPES_UINT32]);
+    connectionOptions[3].key                  = UA_QUALIFIEDNAME(0, "xdpbindflag");
+    UA_UInt32 bindflags                       = xdpBindFlag;
+    UA_Variant_setScalar(&connectionOptions[3].value, &bindflags, &UA_TYPES[UA_TYPES_UINT16]);
     connectionConfig.connectionProperties     = connectionOptions;
-    connectionConfig.connectionPropertiesSize = 2;
-#endif
+    connectionConfig.connectionPropertiesSize = 4;
+
 
     UA_NetworkAddressUrlDataType networkAddressUrlsubscribe = *networkAddressUrlSubscriber;
     connectionConfig.transportProfileUri                    = UA_STRING(ETH_TRANSPORT_PROFILE);
@@ -647,13 +655,12 @@ addPubSubConnection(UA_Server *server, UA_NetworkAddressUrlDataType *networkAddr
     connectionConfig.publisherId.numeric                    = PUBLISHER_ID;
     /* Connection options are given as Key/Value Pairs - Sockprio and Txtime */
     UA_KeyValuePair connectionOptions[2];
-    connectionOptions[0].key = UA_QUALIFIEDNAME(0, "sockpriority");
+    connectionOptions[0].key                  = UA_QUALIFIEDNAME(0, "sockpriority");
     UA_Variant_setScalar(&connectionOptions[0].value, &socketPriority, &UA_TYPES[UA_TYPES_UINT32]);
-    connectionOptions[1].key = UA_QUALIFIEDNAME(0, "enablesotxtime");
+    connectionOptions[1].key                  = UA_QUALIFIEDNAME(0, "enablesotxtime");
     UA_Variant_setScalar(&connectionOptions[1].value, &disableSoTxtime, &UA_TYPES[UA_TYPES_BOOLEAN]);
     connectionConfig.connectionProperties     = connectionOptions;
     connectionConfig.connectionPropertiesSize = 2;
-
     UA_Server_addPubSubConnection(server, &connectionConfig, &connectionIdent);
 }
 
@@ -1247,11 +1254,15 @@ static void usage(char *appname)
         " -enableconsolePrint     Experimental: To print the data in console output. Support for higher cycle time\n"
         " -enableBlockingSocket   Run application with blocking socket option. While using blocking socket option need to\n"
         "                         run both the Publisher and Loopback application. Otherwise application will not terminate.\n"
+        " -enableXdpSubscribe     Enable XDP feature for subscriber. XDP_COPY and XDP_FLAGS_SKB_MODE is used by default. Not recommended to be enabled along with blocking socket.\n"
+        " -xdpQueue        [num]  XDP queue value (default %d)\n"
+        " -xdpFlagDrvMode         Use XDP in DRV mode\n"
+        " -xdpBindFlagZeroCopy    Use Zero-Copy mode in XDP\n"
         "\n",
         appname, DEFAULT_CYCLE_TIME, DEFAULT_SOCKET_PRIORITY, DEFAULT_PUB_SCHED_PRIORITY, \
         DEFAULT_SUB_SCHED_PRIORITY, DEFAULT_USERAPPLICATION_SCHED_PRIORITY, \
         DEFAULT_PUB_CORE, DEFAULT_SUB_CORE, DEFAULT_USER_APP_CORE, \
-        DEFAULT_PUBLISHING_MAC_ADDRESS, DEFAULT_SUBSCRIBING_MAC_ADDRESS, DEFAULT_QBV_OFFSET);
+        DEFAULT_PUBLISHING_MAC_ADDRESS, DEFAULT_SUBSCRIBING_MAC_ADDRESS, DEFAULT_QBV_OFFSET, DEFAULT_XDP_QUEUE);
 }
 
 /**
@@ -1295,7 +1306,11 @@ int main(int argc, char **argv) {
         {"enableCsvLog",         no_argument,       0, 'n'},
         {"enableconsolePrint",   no_argument,       0, 'o'},
         {"enableBlockingSocket", no_argument,       0, 'p'},
-        {"help",                 no_argument,       0, 'q'},
+        {"xdpQueue",             required_argument, 0, 'q'},
+        {"xdpFlagDrvMode",       no_argument,       0, 'r'},
+        {"xdpBindFlagZeroCopy",  no_argument,       0, 's'},
+        {"enableXdpSubscribe",   no_argument,       0, 't'},
+        {"help",                 no_argument,       0, 'u'},
         {0,                      0,                 0,  0 }
     };
 
@@ -1351,6 +1366,18 @@ int main(int argc, char **argv) {
                 enableBlockingSocket = UA_TRUE;
                 break;
             case 'q':
+                xdpQueue = (UA_UInt32)atoi(optarg);
+                break;
+            case 'r':
+                xdpFlag = XDP_FLAGS_DRV_MODE;
+                break;
+            case 's':
+                xdpBindFlag = XDP_ZEROCOPY;
+                break;
+            case 't':
+                enableXdpSubscribe = UA_TRUE;
+                break;
+            case 'u':
                 usage(progname);
                 return -1;
             case '?':
@@ -1372,8 +1399,19 @@ int main(int argc, char **argv) {
     }
 
     if (enableBlockingSocket == UA_TRUE) {
+        if (enableXdpSubscribe == UA_TRUE) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Cannot enable blocking socket and xdp at the same time");
+            usage(progname);
+            return -1;
+        }
+
         if (pubCore == subCore)
             pubCore = 3;
+    }
+
+    if (xdpFlag == XDP_FLAGS_DRV_MODE || xdpBindFlag == XDP_ZEROCOPY) {
+        if (enableXdpSubscribe == UA_FALSE)
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,"Flag enableXdpSubscribe is false, running application without XDP");
     }
 
     UA_ServerConfig_setMinimal(config, PORT_NUMBER, NULL);
@@ -1442,23 +1480,13 @@ if (enableCsvLog)
 #endif
 
 #if defined (PUBLISHER) && defined(SUBSCRIBER)
-#if defined (UA_ENABLE_PUBSUB_ETH_UADP_XDP)
-    config->pubsubTransportLayers[1] = UA_PubSubTransportLayerEthernetXDP();
-    config->pubsubTransportLayersSize++;
-#else
     config->pubsubTransportLayers[1] = UA_PubSubTransportLayerEthernet();
     config->pubsubTransportLayersSize++;
 #endif
-#endif
 
 #if defined(SUBSCRIBER) && !defined(PUBLISHER)
-#if defined (UA_ENABLE_PUBSUB_ETH_UADP_XDP)
-    config->pubsubTransportLayers[0] = UA_PubSubTransportLayerEthernetXDP();
-    config->pubsubTransportLayersSize++;
-#else
     config->pubsubTransportLayers[0] = UA_PubSubTransportLayerEthernet();
     config->pubsubTransportLayersSize++;
-#endif
 #endif
 
 #if defined(SUBSCRIBER)
