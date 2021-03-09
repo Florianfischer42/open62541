@@ -191,6 +191,52 @@ onRead(UA_Server *server, const UA_NodeId *sessionId, void *sessionContext,
         }
         break;
     }
+    case UA_NS0ID_PUBLISHEDEVENTSTYPE: {
+        UA_PublishedDataSet *publishedDataSet = UA_PublishedDataSet_findPDSbyId(server, *myNodeId);
+        if(!publishedDataSet)
+            return;
+        switch(nodeContext->elementClassiefier) {
+            case UA_NS0ID_PUBLISHEDEVENTSTYPE_CONFIGURATIONVERSION:{
+                UA_Variant_setScalarCopy(&value, &publishedDataSet->dataSetMetaData.configurationVersion,
+                                         &UA_TYPES[UA_TYPES_CONFIGURATIONVERSIONDATATYPE]);
+                break;
+            }
+            case UA_NS0ID_PUBLISHEDEVENTSTYPE_DATASETMETADATA:{
+                UA_Variant_setScalarCopy(&value, &publishedDataSet->dataSetMetaData,
+                                         &UA_TYPES[UA_TYPES_DATASETMETADATATYPE]);
+                break;
+            }
+            case UA_NS0ID_PUBLISHEDEVENTSTYPE_SELECTEDFIELDS:{
+                UA_SimpleAttributeOperand *sao = (UA_SimpleAttributeOperand *)
+                    UA_calloc(publishedDataSet->config.config.event.selectedFieldsSize, sizeof(UA_SimpleAttributeOperand));
+
+                for(size_t i = 0; i < publishedDataSet->config.config.event.selectedFieldsSize; i++){
+                    sao[i].attributeId = UA_ATTRIBUTEID_VALUE;
+                    sao[i].browsePath = publishedDataSet->config.config.event.selectedFields[i].browsePath;
+                    sao[i].browsePathSize = publishedDataSet->config.config.event.selectedFields[i].browsePathSize;
+                    sao[i].typeDefinitionId = publishedDataSet->config.config.event.selectedFields[i].typeDefinitionId;
+                }
+
+                UA_Variant_setArray(&value, sao, publishedDataSet->config.config.event.selectedFieldsSize,
+                                    &UA_TYPES[UA_TYPES_SIMPLEATTRIBUTEOPERAND]);
+                break;
+            }
+            case UA_NS0ID_PUBLISHEDEVENTSTYPE_PUBSUBEVENTNOTIFIER:{
+                UA_Variant_setScalarCopy(&value, &publishedDataSet->config.config.event.eventNotifier,
+                                         &UA_TYPES[UA_TYPES_NODEID]);
+                break;
+            }
+            case UA_NS0ID_PUBLISHEDEVENTSTYPE_FILTER:{
+                UA_Variant_setScalarCopy(&value, &publishedDataSet->config.config.event.filter,
+                                         &UA_TYPES[UA_TYPES_CONTENTFILTER]);
+                break;
+            }
+            default:
+                UA_LOG_WARNING(&server->config.logger, UA_LOGCATEGORY_SERVER,
+                               "Read error! Unknown property.");
+        }
+        break;
+    }
     default:
         UA_LOG_WARNING(&server->config.logger, UA_LOGCATEGORY_SERVER,
                        "Read error! Unknown parent element.");
@@ -600,6 +646,108 @@ removeDataSetFolderAction(UA_Server *server,
     return retVal;
 }
 #endif
+
+UA_StatusCode
+addPublishedEventsRepresentation(UA_Server *server, UA_PublishedDataSet *publishedDataSet) {
+    UA_StatusCode retVal = UA_STATUSCODE_GOOD;
+    if(publishedDataSet->config.name.length > 512)
+        return UA_STATUSCODE_BADOUTOFMEMORY;
+    UA_STACKARRAY(char, pdsName, sizeof(char) * publishedDataSet->config.name.length +1);
+    memcpy(pdsName, publishedDataSet->config.name.data, publishedDataSet->config.name.length);
+    pdsName[publishedDataSet->config.name.length] = '\0';
+    //This code block must use a lock
+    UA_NODESTORE_REMOVE(server, &publishedDataSet->identifier);
+    retVal |= addPubSubObjectNode(server, pdsName, publishedDataSet->identifier.identifier.numeric,
+                                  UA_NS0ID_PUBLISHSUBSCRIBE_PUBLISHEDDATASETS,
+                                  UA_NS0ID_HASPROPERTY, UA_NS0ID_PUBLISHEDEVENTSTYPE);
+    //End lock zone
+
+    UA_ValueCallback valueCallback;
+    valueCallback.onRead = onRead;
+    valueCallback.onWrite = NULL;
+
+    UA_NodeId configurationVersionNode =
+        findSingleChildNode(server, UA_QUALIFIEDNAME(0, "ConfigurationVersion"),
+                            UA_NODEID_NUMERIC(0, UA_NS0ID_HASPROPERTY),
+                            UA_NODEID_NUMERIC(0, publishedDataSet->identifier.identifier.numeric));
+    if(UA_NodeId_equal(&configurationVersionNode, &UA_NODEID_NULL))
+        return UA_STATUSCODE_BADNOTFOUND;
+
+    UA_NodePropertyContext * configurationVersionContext = (UA_NodePropertyContext *)
+        UA_malloc(sizeof(UA_NodePropertyContext));
+    configurationVersionContext->parentNodeId = publishedDataSet->identifier;
+    configurationVersionContext->parentClassifier = UA_NS0ID_PUBLISHEDEVENTSTYPE;
+    configurationVersionContext->elementClassiefier =
+        UA_NS0ID_PUBLISHEDEVENTSTYPE_CONFIGURATIONVERSION;
+    retVal |= addVariableValueSource(server, valueCallback, configurationVersionNode,
+                                     configurationVersionContext);
+
+    UA_NodeId dataSetMetaDataNode =
+        findSingleChildNode(server, UA_QUALIFIEDNAME(0, "DataSetMetaData"),
+                            UA_NODEID_NUMERIC(0, UA_NS0ID_HASPROPERTY),
+                            UA_NODEID_NUMERIC(0, publishedDataSet->identifier.identifier.numeric));
+    if(UA_NodeId_equal(&dataSetMetaDataNode, &UA_NODEID_NULL))
+        return UA_STATUSCODE_BADNOTFOUND;
+
+    UA_NodePropertyContext * metaDataContext = (UA_NodePropertyContext *)
+        UA_malloc(sizeof(UA_NodePropertyContext));
+    metaDataContext->parentNodeId = publishedDataSet->identifier;
+    metaDataContext->parentClassifier = UA_NS0ID_PUBLISHEDEVENTSTYPE;
+    metaDataContext->elementClassiefier = UA_NS0ID_PUBLISHEDEVENTSTYPE_DATASETMETADATA;
+    retVal |= addVariableValueSource(server, valueCallback, dataSetMetaDataNode, metaDataContext);
+
+    UA_NodeId selectedFieldsNode =
+        findSingleChildNode(server, UA_QUALIFIEDNAME(0, "SelectedFields"),
+                            UA_NODEID_NUMERIC(0, UA_NS0ID_HASPROPERTY),
+                            UA_NODEID_NUMERIC(0, publishedDataSet->identifier.identifier.numeric));
+    if(UA_NodeId_equal(&selectedFieldsNode, &UA_NODEID_NULL))
+        return UA_STATUSCODE_BADNOTFOUND;
+
+    UA_NodePropertyContext * selectedFieldsContext = (UA_NodePropertyContext *)
+        UA_malloc(sizeof(UA_NodePropertyContext));
+    selectedFieldsContext->parentNodeId = publishedDataSet->identifier;
+    selectedFieldsContext->parentClassifier = UA_NS0ID_PUBLISHEDEVENTSTYPE;
+    selectedFieldsContext->elementClassiefier = UA_NS0ID_PUBLISHEDEVENTSTYPE_SELECTEDFIELDS;
+    retVal |= addVariableValueSource(server, valueCallback, selectedFieldsNode,
+                                     selectedFieldsContext);
+
+    UA_NodeId eventNotifierNode =
+        findSingleChildNode(server, UA_QUALIFIEDNAME(0, "EventNotifier"),
+                            UA_NODEID_NUMERIC(0, UA_NS0ID_HASPROPERTY),
+                            UA_NODEID_NUMERIC(0, publishedDataSet->identifier.identifier.numeric));
+    if(UA_NodeId_equal(&eventNotifierNode, &UA_NODEID_NULL))
+        return UA_STATUSCODE_BADNOTFOUND;
+
+    UA_NodePropertyContext * eventNotifierContext = (UA_NodePropertyContext *)
+        UA_malloc(sizeof(UA_NodePropertyContext));
+    eventNotifierContext->parentNodeId = publishedDataSet->identifier;
+    eventNotifierContext->parentClassifier = UA_NS0ID_PUBLISHEDEVENTSTYPE;
+    eventNotifierContext->elementClassiefier = UA_NS0ID_PUBLISHEDEVENTSTYPE_PUBSUBEVENTNOTIFIER;
+    retVal |= addVariableValueSource(server, valueCallback, eventNotifierNode,
+                                     eventNotifierContext);
+
+    UA_NodeId filterNode =
+        findSingleChildNode(server, UA_QUALIFIEDNAME(0, "Filter"),
+                            UA_NODEID_NUMERIC(0, UA_NS0ID_HASPROPERTY),
+                            UA_NODEID_NUMERIC(0, publishedDataSet->identifier.identifier.numeric));
+    if(UA_NodeId_equal(&filterNode, &UA_NODEID_NULL))
+        return UA_STATUSCODE_BADNOTFOUND;
+
+    UA_NodePropertyContext * filterContext = (UA_NodePropertyContext *)
+        UA_malloc(sizeof(UA_NodePropertyContext));
+    filterContext->parentNodeId = publishedDataSet->identifier;
+    filterContext->parentClassifier = UA_NS0ID_PUBLISHEDEVENTSTYPE;
+    filterContext->elementClassiefier = UA_NS0ID_PUBLISHEDEVENTSTYPE_FILTER;
+    retVal |= addVariableValueSource(server, valueCallback, filterNode,
+                                     filterContext);
+
+#ifdef UA_ENABLE_PUBSUB_INFORMATIONMODEL_METHODS
+    retVal |= UA_Server_addReference(server, publishedDataSet->identifier,
+                                     UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
+                                     UA_EXPANDEDNODEID_NUMERIC(0, UA_NS0ID_PUBLISHEDEVENTSTYPE_MODIFYFIELDSELECTION), true);
+#endif
+    return retVal;
+}
 
 UA_StatusCode
 addPublishedDataItemsRepresentation(UA_Server *server, UA_PublishedDataSet *publishedDataSet) {

@@ -235,7 +235,20 @@ UA_Server_addPublishedDataSet(UA_Server *server, const UA_PublishedDataSetConfig
     result.configurationVersion.majorVersion = UA_PubSubConfigurationVersionTimeDifference();
     result.configurationVersion.minorVersion = UA_PubSubConfigurationVersionTimeDifference();
 #ifdef UA_ENABLE_PUBSUB_INFORMATIONMODEL
-    addPublishedDataItemsRepresentation(server, newPubSubDataSetField);
+    switch(tmpPublishedDataSetConfig.publishedDataSetType){
+        case UA_PUBSUB_DATASET_PUBLISHEDITEMS_TEMPLATE:
+            addPublishedDataItemsRepresentation(server, newPubSubDataSetField);
+            break;
+        case UA_PUBSUB_DATASET_PUBLISHEDEVENTS_TEMPLATE:
+            addPublishedEventsRepresentation(server, newPubSubDataSetField);
+            break;
+        case UA_PUBSUB_DATASET_PUBLISHEDEVENTS:
+            addPublishedEventsRepresentation(server, newPubSubDataSetField);
+            break;
+        case UA_PUBSUB_DATASET_PUBLISHEDITEMS:
+            addPublishedDataItemsRepresentation(server, newPubSubDataSetField);
+            break;
+    }
 #endif
     return result;
 }
