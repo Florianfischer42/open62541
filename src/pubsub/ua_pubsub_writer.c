@@ -11,7 +11,6 @@
 
 #include <open62541/server_pubsub.h>
 #include "server/ua_server_internal.h"
-#include "server/ua_subscription.h"
 
 #ifdef UA_ENABLE_PUBSUB /* conditional compilation */
 
@@ -688,7 +687,13 @@ generateFieldMetaData(UA_Server *server, UA_DataSetField *field, UA_FieldMetaDat
             fieldMetaData->dataSetFieldId = UA_GUID_NULL;
             fieldMetaData->properties = NULL;
             fieldMetaData->propertiesSize = 0;
-            if(field->config.field.variable.promotedField){
+            fieldMetaData->arrayDimensionsSize = 0;
+            fieldMetaData->dataType = field->config.field.events.type.typeId;
+            const UA_DataType * currentDataType =
+                UA_findDataTypeWithCustom(&fieldMetaData->dataType,server->config.customDataTypes);
+            if(currentDataType->typeIndex <= 135)
+                fieldMetaData->builtInType = (UA_Byte)currentDataType->typeIndex;
+            if(field->config.field.events.promotedField){
                 fieldMetaData->fieldFlags = UA_DATASETFIELDFLAGS_PROMOTEDFIELD;
             } else {
                 fieldMetaData->fieldFlags = UA_DATASETFIELDFLAGS_NONE;
@@ -748,8 +753,8 @@ UA_Server_addDataSetField(UA_Server *server, const UA_NodeId publishedDataSet,
 
         //TODO: make some adjustments for PublishedItems
 
-        result.result = UA_STATUSCODE_BADNOTIMPLEMENTED;
-        return result;
+        //result.result = UA_STATUSCODE_BADNOTIMPLEMENTED;
+        //return result;
     }
 
     if (newField->config.dataSetFieldType == UA_PUBSUB_DATASETFIELD_VARIABLE){
@@ -1601,7 +1606,6 @@ UA_PubSubDataSetWriter_generateKeyFrameMessage(UA_Server *server,
 
 #ifdef UA_ENABLE_PUBSUB_EVENTS
     if(currentDataSet->config.publishedDataSetType == UA_PUBSUB_DATASET_PUBLISHEDEVENTS){
-        if(dataSetWriter->eventQueueEntries == 0) return UA_STATUSCODE_GOOD;
         UA_UInt16 eventSize = (UA_UInt16)dataSetWriter->eventQueueEntries;
         dataSetMessage->header.dataSetMessageValid = true;
         dataSetMessage->header.dataSetMessageType = UA_DATASETMESSAGE_DATAKEYFRAME;
