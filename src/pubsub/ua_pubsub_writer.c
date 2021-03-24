@@ -1461,11 +1461,16 @@ UA_Server_removeDataSetWriter(UA_Server *server, const UA_NodeId dsw){
 UA_StatusCode
 UA_DataSetFieldConfig_copy(const UA_DataSetFieldConfig *src, UA_DataSetFieldConfig *dst){
     memcpy(dst, src, sizeof(UA_DataSetFieldConfig));
-    if(src->dataSetFieldType == UA_PUBSUB_DATASETFIELD_VARIABLE) {
+    if(src->dataSetFieldType == UA_PUBSUB_DATASETFIELD_VARIABLE){
         UA_String_copy(&src->field.variable.fieldNameAlias, &dst->field.variable.fieldNameAlias);
         UA_PublishedVariableDataType_copy(&src->field.variable.publishParameters,
                                           &dst->field.variable.publishParameters);
-    } else {
+    }else if(src->dataSetFieldType == UA_PUBSUB_DATASETFIELD_EVENT){
+        UA_String_copy(&src->field.events.fieldNameAlias, &dst->field.events.fieldNameAlias);
+        UA_SimpleAttributeOperand_copy(&src->field.events.selectedField,
+                                       &dst->field.events.selectedField);
+        //Todo: deep copy of DataType necessary?
+    }else{
         return UA_STATUSCODE_BADNOTSUPPORTED;
     }
 
