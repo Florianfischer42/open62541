@@ -33,6 +33,7 @@
 
 UA_NodeId connectionIdent, publishedDataSetIdent, writerGroupIdent;
 static UA_NodeId eventType;
+static UA_NodeId eventType2;
 
 /*********************** PubSub Methods ***********************/
 
@@ -85,6 +86,27 @@ addPublishedDataSet(UA_Server *server) {
     selectedFields[1].attributeId = UA_ATTRIBUTEID_VALUE;
     selectedFields[1].browsePath[0] = UA_QUALIFIEDNAME_ALLOC(0, "Message");
     publishedDataSetConfig.config.event.selectedFields = selectedFields;
+
+    /*Adds a ContentFilter to the PDS*/
+    UA_ContentFilter *contentFilter = UA_ContentFilter_new();
+    UA_ContentFilterElement *contentFilterElement = UA_ContentFilterElement_new();
+    UA_ExtensionObject *filterOperandExObj = UA_ExtensionObject_new();
+    UA_LiteralOperand *literalOperand = UA_LiteralOperand_new();
+
+    contentFilter->elementsSize = 1;
+    contentFilter->elements = contentFilterElement;
+
+    contentFilterElement->filterOperandsSize = 1;
+    contentFilterElement->filterOperands = filterOperandExObj;
+    contentFilterElement->filterOperator = UA_FILTEROPERATOR_OFTYPE;
+
+    filterOperandExObj->content.decoded.type = &UA_TYPES[UA_TYPES_LITERALOPERAND];
+    filterOperandExObj->content.decoded.data = literalOperand;
+
+    UA_Variant_setScalar(&literalOperand->value, &eventType2, &UA_TYPES[UA_TYPES_NODEID]);
+
+    publishedDataSetConfig.config.event.filter = *contentFilter;
+
     /* Create new PublishedDataSet based on the PublishedDataSetConfig. */
     UA_Server_addPublishedDataSet(server, &publishedDataSetConfig, &publishedDataSetIdent);
 }
@@ -223,11 +245,20 @@ addNewEventType(UA_Server *server) {
     UA_ObjectTypeAttributes attr = UA_ObjectTypeAttributes_default;
     attr.displayName = UA_LOCALIZEDTEXT("en-US", "PublishEventsExampleEventType");
     attr.description = UA_LOCALIZEDTEXT("en-US", "The simple event type we created");
-    return UA_Server_addObjectTypeNode(server, UA_NODEID_NULL,
+    UA_Server_addObjectTypeNode(server, UA_NODEID_NULL,
                                        UA_NODEID_NUMERIC(0, UA_NS0ID_BASEEVENTTYPE),
                                        UA_NODEID_NUMERIC(0, UA_NS0ID_HASSUBTYPE),
                                        UA_QUALIFIEDNAME(0, "PublishEventsExampleEventType"),
                                        attr, NULL, &eventType);
+
+    UA_ObjectTypeAttributes attr1 = UA_ObjectTypeAttributes_default;
+    attr1.displayName = UA_LOCALIZEDTEXT("en-US", "PublishEventsExampleEventType2");
+    attr1.description = UA_LOCALIZEDTEXT("en-US", "The simple event type we created to test the ContentFilter");
+    return UA_Server_addObjectTypeNode(server, UA_NODEID_NULL,
+                                       UA_NODEID_NUMERIC(0, UA_NS0ID_BASEEVENTTYPE),
+                                       UA_NODEID_NUMERIC(0, UA_NS0ID_HASSUBTYPE),
+                                       UA_QUALIFIEDNAME(0, "PublishEventsExampleEventType2"),
+                                       attr1, NULL, &eventType2);
 }
 
 UA_Boolean running = true;

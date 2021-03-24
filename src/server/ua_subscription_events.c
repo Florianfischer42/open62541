@@ -726,6 +726,16 @@ UA_Server_triggerEvent(UA_Server *server, const UA_NodeId eventNodeId,
     PublishedDataSetEventEntry *entry;
     LIST_FOREACH(entry, &server->pubSubManager.publishedDataSetEvents, listEntry){
         if(UA_NodeId_equal(&entry->pds->config.config.event.eventNotifier, &origin)){
+
+            retval = UA_Server_evaluateWhereClauseContentFilter(server, &eventNodeId, &entry->pds->config.config.event.filter);
+            if(retval != UA_STATUSCODE_GOOD){
+                UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER,
+                             "Filtered out by ContentFilter. StatusCode %s", UA_StatusCode_name(retval));
+                continue;
+            }else{
+                UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER, "ContentFilter GOOD");
+            };
+
             retval = addEventToDataSetWriter(server, eventNodeId, entry->dsw, entry->pds);
             if(retval != UA_STATUSCODE_GOOD) {
                 UA_LOG_WARNING(&server->config.logger, UA_LOGCATEGORY_SERVER,
