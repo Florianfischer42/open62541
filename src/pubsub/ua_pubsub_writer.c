@@ -1505,6 +1505,9 @@ UA_DataSetFieldConfig_clear(UA_DataSetFieldConfig *dataSetFieldConfig){
     if(dataSetFieldConfig->dataSetFieldType == UA_PUBSUB_DATASETFIELD_VARIABLE){
         UA_String_clear(&dataSetFieldConfig->field.variable.fieldNameAlias);
         UA_PublishedVariableDataType_clear(&dataSetFieldConfig->field.variable.publishParameters);
+    }else if(dataSetFieldConfig->dataSetFieldType == UA_PUBSUB_DATASETFIELD_EVENT){
+        UA_String_clear(&dataSetFieldConfig->field.events.fieldNameAlias);
+        UA_SimpleAttributeOperand_clear(&dataSetFieldConfig->field.events.selectedField);
     }
 }
 
