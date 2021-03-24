@@ -753,14 +753,6 @@ UA_Server_addDataSetField(UA_Server *server, const UA_NodeId publishedDataSet,
     else
         TAILQ_INSERT_HEAD(&currentDataSet->fields, newField, listEntry);
 
-    if(currentDataSet->config.publishedDataSetType != UA_PUBSUB_DATASET_PUBLISHEDITEMS){
-
-        //TODO: make some adjustments for PublishedItems
-
-        //result.result = UA_STATUSCODE_BADNOTIMPLEMENTED;
-        //return result;
-    }
-
     if (newField->config.dataSetFieldType == UA_PUBSUB_DATASETFIELD_VARIABLE){
         if(newField->config.field.variable.promotedField)
             currentDataSet->promotedFieldsCount++;
