@@ -762,7 +762,7 @@ addPublishedEventsAction(UA_Server *server,
     publishedDataSetConfig.config.event.filter = *filter;
     publishedDataSetConfig.config.event.selectedFieldsSize = selectedFieldsSize;
     publishedDataSetConfig.config.event.selectedFields = (UA_SimpleAttributeOperand *)UA_calloc(selectedFieldsSize, sizeof(UA_SimpleAttributeOperand));
-    //TODO: nicht ganz sicher
+
     for(size_t i = 0; i < publishedDataSetConfig.config.event.selectedFieldsSize; i++){
         UA_SimpleAttributeOperand_copy(&selectedFields[i],
                                        &publishedDataSetConfig.config.event.selectedFields[i]);
@@ -781,7 +781,7 @@ addPublishedEventsAction(UA_Server *server,
             dataSetFieldConfig.field.events.promotedField = UA_TRUE;
         }
         dataSetFieldConfig.field.events.selectedField = selectedFields[j];
-        UA_Server_addDataSetField(server, dataSetId, &dataSetFieldConfig, NULL); //TODO: method not complete for events
+        UA_Server_addDataSetField(server, dataSetId, &dataSetFieldConfig, NULL);
     }
 
     UA_SimpleAttributeOperand_clear(selectedFields);
