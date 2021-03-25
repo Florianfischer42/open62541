@@ -690,10 +690,10 @@ generateFieldMetaData(UA_Server *server, UA_DataSetField *field, UA_FieldMetaDat
             fieldMetaData->propertiesSize = 0;
             fieldMetaData->arrayDimensionsSize = 0;
             fieldMetaData->dataType = field->config.field.events.type.typeId;
-            const UA_DataType * currentDataType =
+            const UA_DataType * curDataType =
                 UA_findDataTypeWithCustom(&fieldMetaData->dataType,server->config.customDataTypes);
-            if(currentDataType->typeIndex <= 135)
-                fieldMetaData->builtInType = (UA_Byte)currentDataType->typeIndex;
+            if(curDataType->typeIndex <= 135)
+                fieldMetaData->builtInType = (UA_Byte)curDataType->typeIndex;
             if(field->config.field.events.promotedField){
                 fieldMetaData->fieldFlags = UA_DATASETFIELDFLAGS_PROMOTEDFIELD;
             } else {
