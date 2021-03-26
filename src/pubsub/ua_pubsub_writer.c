@@ -1435,6 +1435,27 @@ UA_Server_removeDataSetWriter(UA_Server *server, const UA_NodeId dsw){
     if(!publishedDataSet)
         return UA_STATUSCODE_BADNOTFOUND;
 
+#ifdef UA_ENABLE_PUBSUB_EVENTS
+    if(publishedDataSet->config.publishedDataSetType == UA_PUBSUB_DATASET_PUBLISHEDEVENTS){
+        /*Cleans up the DSW EventQueue*/
+        size_t eventSize = dataSetWriter->eventQueueEntries;
+        for(size_t i = 0; i < eventSize; i++){
+            EventQueueEntry *eventQueueEntry = SIMPLEQ_FIRST(&dataSetWriter->eventQueue);
+            SIMPLEQ_REMOVE_HEAD(&dataSetWriter->eventQueue, listEntry);
+            dataSetWriter->eventQueueEntries--;
+            UA_free(eventQueueEntry);
+        }
+        /*Cleans up the Event-PDS list*/
+        PublishedDataSetEventEntry *entry, *entry_tmp;
+        LIST_FOREACH_SAFE(entry, &server->pubSubManager.publishedDataSetEvents, listEntry, entry_tmp){
+            if(UA_NodeId_equal(&entry->dsw->identifier, &dataSetWriter->identifier)){
+                LIST_REMOVE(entry, listEntry);
+                UA_free(entry);
+            }
+        }
+    }
+#endif /*UA_ENABLE_PUBSUB_EVENTS*/
+
     linkedWriterGroup->writersCount--;
 #ifdef UA_ENABLE_PUBSUB_INFORMATIONMODEL
     removeDataSetWriterRepresentation(server, dataSetWriter);
