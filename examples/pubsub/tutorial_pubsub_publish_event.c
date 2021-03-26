@@ -109,6 +109,9 @@ addPublishedDataSet(UA_Server *server) {
 
     /* Create new PublishedDataSet based on the PublishedDataSetConfig. */
     UA_Server_addPublishedDataSet(server, &publishedDataSetConfig, &publishedDataSetIdent);
+
+    /*The config is deep-copied, free fields again*/
+    UA_free(selectedFields);
 }
 
 static void
