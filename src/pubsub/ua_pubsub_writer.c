@@ -1627,6 +1627,7 @@ UA_PubSubDataSetWriter_generateKeyFrameMessage(UA_Server *server,
 
             // Create DataValue for Message
             UA_DataValue dataValue = eventQueueEntry->value;
+            UA_free(eventQueueEntry);
 
             if(((u64)dataSetWriter->config.dataSetFieldContentMask &
                 (u64)UA_DATASETFIELDCONTENTMASK_STATUSCODE) == 0)
