@@ -87,6 +87,9 @@ addPublishedDataSet(UA_Server *server) {
     publishedDataSetConfig.config.event.selectedFields = selectedFields;
     /* Create new PublishedDataSet based on the PublishedDataSetConfig. */
     UA_Server_addPublishedDataSet(server, &publishedDataSetConfig, &publishedDataSetIdent);
+
+    /*The config is deep-copied, free fields again*/
+    UA_free(selectedFields);
 }
 
 static void
