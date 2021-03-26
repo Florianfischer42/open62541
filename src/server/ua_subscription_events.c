@@ -521,20 +521,16 @@ static const UA_NodeId isInFolderReferences[2] =
 
 #ifdef UA_ENABLE_PUBSUB_EVENTS
 //TODO: decide where the method insertDataValue should be
-static UA_StatusCode insertDataValueIntoDSWQueue(UA_Server *server, UA_DataSetWriter *dsw, UA_DataValue *value)  {
+static UA_StatusCode insertDataValueIntoDSWQueue(UA_Server *server, UA_DataSetWriter *dsw, UA_DataValue value)  {
     if(dsw == NULL){
         UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER,
                  "The given DataSetWriter is NULL");
         return UA_STATUSCODE_BADINVALIDARGUMENT;
     }
-    if(value == NULL){
-        UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_USERLAND,
-                     "The given Variant is NULL");
-        return UA_STATUSCODE_BADINVALIDARGUMENT;
-    }
 
     EventQueueEntry *entry = (EventQueueEntry *)malloc(sizeof(EventQueueEntry));
-    entry->value = *value;
+    UA_DataValue_copy(&value, &entry->value);
+    UA_DataValue_clear(&value);
 
     SIMPLEQ_INSERT_TAIL(&dsw->eventQueue, entry, listEntry);
     dsw->eventQueueEntries++;
@@ -551,20 +547,18 @@ addEventToDataSetWriter(UA_Server *server, UA_NodeId eventNodeId,
     }
     UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER, "Found a PublishedDataSet, which publishes this Event");
     UA_SimpleAttributeOperand selectedField;
-    UA_Variant *variant = UA_Variant_new();
-    UA_DataValue *dataValue = UA_DataValue_new();
+    UA_DataValue dataValue;
+    UA_DataValue_init(&dataValue);
     UA_StatusCode retval = UA_STATUSCODE_GOOD;
     UA_DataSetField *dataSetField;
     TAILQ_FOREACH(dataSetField, &publishedDataSet->fields, listEntry){
         selectedField = dataSetField->config.field.events.selectedField;
-        retval = resolveSimpleAttributeOperand(server, &server->adminSession, &eventNodeId, &selectedField, variant);
+        retval = resolveSimpleAttributeOperand(server, &server->adminSession, &eventNodeId, &selectedField, &dataValue.value);
         if(retval != UA_STATUSCODE_GOOD){
             UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER,
                          "SimpleAttributeOperand wasn't able to be resolved as a Variant. StatusCode %s", UA_StatusCode_name(retval));
             return retval;
         };
-        dataValue->value = *variant;
-        dataValue->serverTimestamp = UA_DateTime_now();
         retval |= insertDataValueIntoDSWQueue(server, dataSetWriter, dataValue);
         if(retval != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER,
@@ -572,8 +566,6 @@ addEventToDataSetWriter(UA_Server *server, UA_NodeId eventNodeId,
             return retval;
         }
     }
-    UA_free(variant);
-    UA_free(dataValue);
     return retval;
 }
 
