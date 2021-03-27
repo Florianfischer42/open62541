@@ -363,7 +363,6 @@ typedef struct {
     UA_String fieldNameAlias;
     UA_Boolean promotedField;
     UA_SimpleAttributeOperand selectedField;
-    UA_DataType type;
 } UA_DataSetEventConfig;
 
 typedef struct {

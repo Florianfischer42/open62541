@@ -587,6 +587,7 @@ UA_PublishedDataSet_clear(UA_Server *server, UA_PublishedDataSet *publishedDataS
     UA_NodeId_clear(&publishedDataSet->identifier);
 }
 
+#ifdef UA_ENABLE_PUBSUB_EVENTS
 static UA_NodeId
 findSingleChildNode(UA_Server *server, UA_QualifiedName targetName,
                     UA_NodeId referenceTypeId, UA_NodeId startingNode){
@@ -614,6 +615,7 @@ findSingleChildNode(UA_Server *server, UA_QualifiedName targetName,
     UA_BrowsePathResult_clear(&bpr);
     return resultNodeId;
 }
+#endif /*UA_ENABLE_PUBSUB_EVENTS*/
 
 static UA_StatusCode
 generateFieldMetaData(UA_Server *server, UA_DataSetField *field, UA_FieldMetaData *fieldMetaData) {
