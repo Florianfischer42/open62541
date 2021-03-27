@@ -587,6 +587,34 @@ UA_PublishedDataSet_clear(UA_Server *server, UA_PublishedDataSet *publishedDataS
     UA_NodeId_clear(&publishedDataSet->identifier);
 }
 
+static UA_NodeId
+findSingleChildNode(UA_Server *server, UA_QualifiedName targetName,
+                    UA_NodeId referenceTypeId, UA_NodeId startingNode){
+    UA_NodeId resultNodeId;
+    UA_RelativePathElement rpe;
+    UA_RelativePathElement_init(&rpe);
+    rpe.referenceTypeId = referenceTypeId;
+    rpe.isInverse = false;
+    rpe.includeSubtypes = false;
+    rpe.targetName = targetName;
+    UA_BrowsePath bp;
+    UA_BrowsePath_init(&bp);
+    bp.startingNode = startingNode;
+    bp.relativePath.elementsSize = 1;
+    bp.relativePath.elements = &rpe;
+    UA_BrowsePathResult bpr =
+        UA_Server_translateBrowsePathToNodeIds(server, &bp);
+    if(bpr.statusCode != UA_STATUSCODE_GOOD ||
+       bpr.targetsSize < 1)
+        return UA_NODEID_NULL;
+    if(UA_NodeId_copy(&bpr.targets[0].targetId.nodeId, &resultNodeId) != UA_STATUSCODE_GOOD){
+        UA_BrowsePathResult_clear(&bpr);
+        return UA_NODEID_NULL;
+    }
+    UA_BrowsePathResult_clear(&bpr);
+    return resultNodeId;
+}
+
 static UA_StatusCode
 generateFieldMetaData(UA_Server *server, UA_DataSetField *field, UA_FieldMetaData *fieldMetaData) {
     switch (field->config.dataSetFieldType){
@@ -689,11 +717,38 @@ generateFieldMetaData(UA_Server *server, UA_DataSetField *field, UA_FieldMetaDat
             fieldMetaData->properties = NULL;
             fieldMetaData->propertiesSize = 0;
             fieldMetaData->arrayDimensionsSize = 0;
-            fieldMetaData->dataType = field->config.field.events.type.typeId;
-            const UA_DataType * curDataType =
-                UA_findDataTypeWithCustom(&fieldMetaData->dataType,server->config.customDataTypes);
-            if(curDataType->typeIndex <= 135)
-                fieldMetaData->builtInType = (UA_Byte)curDataType->typeIndex;
+            UA_NodeId childNodeId = findSingleChildNode(server,
+                                                        *field->config.field.events.selectedField.browsePath,
+                                                        UA_NODEID_NUMERIC(0, UA_NS0ID_HASPROPERTY),
+                                                        field->config.field.events.selectedField.typeDefinitionId);
+            if(!UA_NodeId_isNull(&childNodeId)){
+                if(UA_Server_readDataType(server, childNodeId,
+                                          &fieldMetaData->dataType) !=
+                   UA_STATUSCODE_GOOD) {
+                    if(fieldMetaData->arrayDimensions) {
+                        UA_free(fieldMetaData->arrayDimensions);
+                        return UA_STATUSCODE_BADINTERNALERROR;
+                    }
+                }
+                if(!UA_NodeId_isNull(&fieldMetaData->dataType)) {
+                    const UA_DataType *currentDataType = UA_findDataTypeWithCustom(
+                        &fieldMetaData->dataType, server->config.customDataTypes);
+                    UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER,
+                                "MetaData creation. Found DataType %s.",
+                                currentDataType->typeName);
+                    // check if the datatype is a builtInType, if yes set the builtinType
+                    if(currentDataType->typeIndex <= 135)
+                        fieldMetaData->builtInType = (UA_Byte)currentDataType->typeIndex;
+                } else {
+                    UA_LOG_WARNING(
+                        &server->config.logger, UA_LOGCATEGORY_SERVER,
+                        "PubSub meta data generation. DataType Node is UA_NODEID_NULL.");
+                }
+            } else {
+                UA_LOG_WARNING(
+                    &server->config.logger, UA_LOGCATEGORY_SERVER,
+                    "The searched Field wasn't found");
+            }
             if(field->config.field.events.promotedField){
                 fieldMetaData->fieldFlags = UA_DATASETFIELDFLAGS_PROMOTEDFIELD;
             } else {
