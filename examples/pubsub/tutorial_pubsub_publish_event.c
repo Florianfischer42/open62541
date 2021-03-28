@@ -88,24 +88,29 @@ addPublishedDataSet(UA_Server *server) {
     publishedDataSetConfig.config.event.selectedFields = selectedFields;
 
     /*Adds a ContentFilter to the PDS*/
-    UA_ContentFilter *contentFilter = UA_ContentFilter_new();
-    UA_ContentFilterElement *contentFilterElement = UA_ContentFilterElement_new();
-    UA_ExtensionObject *filterOperandExObj = UA_ExtensionObject_new();
-    UA_LiteralOperand *literalOperand = UA_LiteralOperand_new();
+    UA_ContentFilter contentFilter;
+    UA_ContentFilter_init(&contentFilter);
+    UA_ContentFilterElement contentFilterElement;
+    UA_ContentFilterElement_init(&contentFilterElement);
+    UA_ExtensionObject filterOperandExObj;
+    UA_ExtensionObject_init(&filterOperandExObj);
+    UA_LiteralOperand literalOperand;
+    UA_LiteralOperand_init(&literalOperand);
 
-    contentFilter->elementsSize = 1;
-    contentFilter->elements = contentFilterElement;
+    contentFilter.elementsSize = 1;
+    contentFilter.elements = &contentFilterElement;
 
-    contentFilterElement->filterOperandsSize = 1;
-    contentFilterElement->filterOperands = filterOperandExObj;
-    contentFilterElement->filterOperator = UA_FILTEROPERATOR_OFTYPE;
+    contentFilterElement.filterOperandsSize = 1;
+    contentFilterElement.filterOperands = &filterOperandExObj;
+    contentFilterElement.filterOperator = UA_FILTEROPERATOR_OFTYPE;
 
-    filterOperandExObj->content.decoded.type = &UA_TYPES[UA_TYPES_LITERALOPERAND];
-    filterOperandExObj->content.decoded.data = literalOperand;
+    filterOperandExObj.encoding             = UA_EXTENSIONOBJECT_DECODED;
+    filterOperandExObj.content.decoded.type = &UA_TYPES[UA_TYPES_LITERALOPERAND];
+    filterOperandExObj.content.decoded.data = &literalOperand;
 
-    UA_Variant_setScalar(&literalOperand->value, &eventType2, &UA_TYPES[UA_TYPES_NODEID]);
+    UA_Variant_setScalar(&literalOperand.value, &eventType, &UA_TYPES[UA_TYPES_NODEID]);
 
-    publishedDataSetConfig.config.event.filter = *contentFilter;
+    publishedDataSetConfig.config.event.filter = contentFilter;
 
     /* Create new PublishedDataSet based on the PublishedDataSetConfig. */
     UA_Server_addPublishedDataSet(server, &publishedDataSetConfig, &publishedDataSetIdent);

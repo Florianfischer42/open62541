@@ -489,10 +489,9 @@ UA_PublishedDataSetConfig_copy(const UA_PublishedDataSetConfig *src,
             res |= UA_NodeId_copy(&src->config.event.eventNotifier,
                                                &dst->config.event.eventNotifier);
 
-            /* Todo: copy of ContentFilter results in error
             res |= UA_ContentFilter_copy(&src->config.event.filter,
                                   &dst->config.event.filter);
-            */
+
             break;
         default:
             res = UA_STATUSCODE_BADINVALIDARGUMENT;
