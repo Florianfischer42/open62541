@@ -4,6 +4,14 @@
  * Copyright (c) 2021 Stefan Joachim Hahn, Technische Hochschule Mittelhessen
  * Copyright (c) 2021 Florian Fischer, Technische Hochschule Mittelhessen
  */
+
+/*
+ * This example should be used in addition to the tutorial_pubsub_publish_events example.
+ * In here we create a basic subscriber and make some small changes to receive events.
+ * With the variable requestMetaData it's possible to choose, whether the subscriber should
+ * request the metadata from the publisher (UA_TRUE) or load it from the fillTestDataSetMetaData
+ * method (UA_FALSE).
+ */
 #define METADATA_SOURCE_SERVER "opc.tcp://localhost:4840"
 #define METADATA_DATASET_NAME "Demo PDS PubSub Events"
 
@@ -31,10 +39,13 @@ UA_NodeId connectionIdentifier;
 UA_NodeId readerGroupIdentifier;
 UA_NodeId readerIdentifier;
 
+/* With this flag, the user can select, whether the FieldMetaData should be requested or the hardcoded one should be used*/
+UA_Boolean requestMetaData = UA_TRUE;
+
 UA_DataSetReaderConfig readerConfig;
 
-//static void fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData);
 static void collectDataSetMetaDataFromServer(UA_Server *server, UA_DataSetMetaDataType *pMetaData);
+static void fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData);
 
 /* Add new connection to the server */
 static UA_StatusCode
@@ -102,7 +113,10 @@ addDataSetReader(UA_Server *server) {
     readerConfig.dataSetWriterId  = 62541;
 
     /* Setting up Meta data configuration in DataSetReader */
-    collectDataSetMetaDataFromServer(server, &readerConfig.dataSetMetaData);
+    if(requestMetaData)
+        collectDataSetMetaDataFromServer(server, &readerConfig.dataSetMetaData);
+    else
+        fillTestDataSetMetaData(&readerConfig.dataSetMetaData);
 
     retval |= UA_Server_addDataSetReader(server, readerGroupIdentifier, &readerConfig,
                                          &readerIdentifier);
@@ -199,8 +213,6 @@ UA_Server_DataSetReader_getMetaDataFromRemote(UA_Server *server, UA_String remot
         return UA_STATUSCODE_BADCONNECTIONREJECTED;
     }
 
-    //UA_TranslateBrowsePathsToNodeIdsRequest translateBrowsePathsToNodeIdsRequest;
-    //UA_Client_Service_translateBrowsePathsToNodeIds(client, )
     UA_NodeId resultMetaDataNodeId = UA_NODEID_NULL;
     UA_BrowseRequest browseRequest;
     UA_BrowseRequest_init(&browseRequest);
@@ -277,6 +289,42 @@ collectDataSetMetaDataFromServer(UA_Server *server, UA_DataSetMetaDataType *pMet
         return;
     }
     printDataSetMetaDataType(pMetaData);
+}
+
+/* Define MetaData for TargetVariables */
+static void
+fillTestDataSetMetaData(UA_DataSetMetaDataType *pMetaData) {
+    if(pMetaData == NULL) {
+        return;
+    }
+
+    UA_DataSetMetaDataType_init (pMetaData);
+    pMetaData->name = UA_STRING ("DataSet 1");
+
+    /* Static definition of number of fields size to
+     * 1 target variable, because the publisher currently
+     * only publishes the message and severity of an event
+     */
+    pMetaData->fieldsSize = 2;
+    pMetaData->fields = (UA_FieldMetaData*)UA_Array_new (pMetaData->fieldsSize,
+                                                         &UA_TYPES[UA_TYPES_FIELDMETADATA]);
+
+    /* Message */
+    UA_FieldMetaData_init (&pMetaData->fields[0]);
+    UA_NodeId_copy (&UA_TYPES[UA_TYPES_LOCALIZEDTEXT].typeId,
+                    &pMetaData->fields[0].dataType);
+    pMetaData->fields[0].builtInType = UA_TYPES_LOCALIZEDTEXT;
+    pMetaData->fields[0].name =  UA_STRING ("Message");
+    pMetaData->fields[0].valueRank = -1; /* scalar */
+
+    /*Severity*/
+    UA_FieldMetaData_init (&pMetaData->fields[1]);
+    UA_NodeId_copy (&UA_TYPES[UA_TYPES_UINT16].typeId,
+                    &pMetaData->fields[1].dataType);
+    pMetaData->fields[1].builtInType = UA_NS0ID_UINT16;
+    pMetaData->fields[1].name =  UA_STRING ("Severity");
+    pMetaData->fields[1].valueRank = -1; /* scalar */
+
 }
 
 /**
