@@ -4,6 +4,8 @@
  *
  *    Copyright 2018 (c) Ari Breitkreuz, fortiss GmbH
  *    Copyright 2020 (c) Christian von Arnim, ISW University of Stuttgart (for VDW and umati)
+ *    Copyright (c) 2021 Stefan Joachim Hahn, Technische Hochschule Mittelhessen
+ *    Copyright (c) 2021 Florian Fischer, Technische Hochschule Mittelhessen
  */
 
 #include "ua_server_internal.h"
@@ -520,8 +522,8 @@ static const UA_NodeId isInFolderReferences[2] =
      {0, UA_NODEIDTYPE_NUMERIC, {UA_NS0ID_HASCOMPONENT}}};
 
 #ifdef UA_ENABLE_PUBSUB_EVENTS
-//TODO: decide where the method insertDataValue should be
-static UA_StatusCode insertDataValueIntoDSWQueue(UA_Server *server, UA_DataSetWriter *dsw, UA_DataValue value)  {
+static UA_StatusCode
+insertDataValueIntoDSWQueue(UA_Server *server, UA_DataSetWriter *dsw, UA_DataValue value)  {
     if(dsw == NULL){
         UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER,
                  "The given DataSetWriter is NULL");
@@ -537,6 +539,7 @@ static UA_StatusCode insertDataValueIntoDSWQueue(UA_Server *server, UA_DataSetWr
     return UA_STATUSCODE_GOOD;
 }
 
+/* Adds all DataSetFields of the given PublishedDataSet to the eventQueue of the given DataSetWriter*/
 static UA_StatusCode
 addEventToDataSetWriter(UA_Server *server, UA_NodeId eventNodeId,
                         UA_DataSetWriter *dataSetWriter, UA_PublishedDataSet *publishedDataSet) {
@@ -545,7 +548,6 @@ addEventToDataSetWriter(UA_Server *server, UA_NodeId eventNodeId,
                     "PublishedDataSet not found.");
         return UA_STATUSCODE_BADBOUNDNOTFOUND;
     }
-    UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_SERVER, "Found a PublishedDataSet, which publishes this Event");
     UA_SimpleAttributeOperand selectedField;
     UA_DataValue dataValue;
     UA_DataValue_init(&dataValue);
@@ -716,6 +718,7 @@ UA_Server_triggerEvent(UA_Server *server, const UA_NodeId eventNodeId,
 
 #ifdef UA_ENABLE_PUBSUB_EVENTS
     PublishedDataSetEventEntry *entry;
+    /* Looks up, whether the eventNotifier of a PublishedDataSet matches the origin of the triggered event */
     LIST_FOREACH(entry, &server->pubSubManager.publishedDataSetEvents, listEntry){
         if(UA_NodeId_equal(&entry->pds->config.config.event.eventNotifier, &origin)){
             retval = addEventToDataSetWriter(server, eventNodeId, entry->dsw, entry->pds);

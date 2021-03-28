@@ -7,6 +7,8 @@
  * Copyright (c) 2019 Kalycito Infotech Private Limited
  * Copyright (c) 2020 Yannick Wallerer, Siemens AG
  * Copyright (c) 2020 Thomas Fischer, Siemens AG
+ * Copyright (c) 2021 Stefan Joachim Hahn, Technische Hochschule Mittelhessen
+ * Copyright (c) 2021 Florian Fischer, Technische Hochschule Mittelhessen
  */
 
 #include <open62541/server_pubsub.h>
@@ -466,9 +468,6 @@ UA_PublishedDataSetConfig_copy(const UA_PublishedDataSetConfig *src,
                                                &dst->config.itemsTemplate.metaData);
             break;
         case UA_PUBSUB_DATASET_PUBLISHEDEVENTS:
-            // TODO: check this
-            // ich glaube hier muss nichts hin, weil am Anfang ja alles mit memcpy kopiert wird
-            // memcpy only does a shallow copy, this function is supposed to make a deep copy
             if(src->config.event.selectedFieldsSize > 0){
                 dst->config.event.selectedFields = (UA_SimpleAttributeOperand *)
                     UA_calloc(src->config.event.selectedFieldsSize,
