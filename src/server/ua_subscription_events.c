@@ -521,7 +521,7 @@ static const UA_NodeId isInFolderReferences[2] =
 
 #ifdef UA_ENABLE_PUBSUB_EVENTS
 //TODO: decide where the method insertDataValue should be
-static UA_StatusCode insertDataValueIntoDSWQueue(UA_Server *server, UA_DataSetWriter *dsw, UA_DataValue value)  {
+static UA_StatusCode insertDataValueIntoDSWQueue(UA_Server *server, UA_DataSetWriter *dsw, UA_DataValue *value)  {
     if(dsw == NULL){
         UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER,
                  "The given DataSetWriter is NULL");
@@ -529,8 +529,7 @@ static UA_StatusCode insertDataValueIntoDSWQueue(UA_Server *server, UA_DataSetWr
     }
 
     EventQueueEntry *entry = (EventQueueEntry *)malloc(sizeof(EventQueueEntry));
-    UA_DataValue_copy(&value, &entry->value);
-    UA_DataValue_clear(&value);
+    UA_DataValue_copy(value, &entry->value);
 
     SIMPLEQ_INSERT_TAIL(&dsw->eventQueue, entry, listEntry);
     dsw->eventQueueEntries++;
@@ -559,12 +558,13 @@ addEventToDataSetWriter(UA_Server *server, UA_NodeId eventNodeId,
                          "SimpleAttributeOperand wasn't able to be resolved as a Variant. StatusCode %s", UA_StatusCode_name(retval));
             return retval;
         };
-        retval |= insertDataValueIntoDSWQueue(server, dataSetWriter, dataValue);
+        retval |= insertDataValueIntoDSWQueue(server, dataSetWriter, &dataValue);
         if(retval != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER,
                          "Inserting DataValue into DSW-queue failed. StatusCode %s", UA_StatusCode_name(retval));
             return retval;
         }
+        UA_DataValue_clear(&dataValue);
     }
     return retval;
 }
