@@ -531,8 +531,7 @@ insertDataValueIntoDSWQueue(UA_Server *server, UA_DataSetWriter *dsw, UA_DataVal
     }
 
     EventQueueEntry *entry = (EventQueueEntry *)malloc(sizeof(EventQueueEntry));
-    UA_DataValue_copy(&value, &entry->value);
-    UA_DataValue_clear(&value);
+    UA_DataValue_copy(value, &entry->value);
 
     SIMPLEQ_INSERT_TAIL(&dsw->eventQueue, entry, listEntry);
     dsw->eventQueueEntries++;
@@ -561,12 +560,13 @@ addEventToDataSetWriter(UA_Server *server, UA_NodeId eventNodeId,
                          "SimpleAttributeOperand wasn't able to be resolved as a Variant. StatusCode %s", UA_StatusCode_name(retval));
             return retval;
         };
-        retval |= insertDataValueIntoDSWQueue(server, dataSetWriter, dataValue);
+        retval |= insertDataValueIntoDSWQueue(server, dataSetWriter, &dataValue);
         if(retval != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER,
                          "Inserting DataValue into DSW-queue failed. StatusCode %s", UA_StatusCode_name(retval));
             return retval;
         }
+        UA_DataValue_clear(&dataValue);
     }
     return retval;
 }
