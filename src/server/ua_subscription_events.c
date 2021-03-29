@@ -523,7 +523,7 @@ static const UA_NodeId isInFolderReferences[2] =
 
 #ifdef UA_ENABLE_PUBSUB_EVENTS
 static UA_StatusCode
-insertDataValueIntoDSWQueue(UA_Server *server, UA_DataSetWriter *dsw, UA_DataValue value)  {
+insertDataValueIntoDSWQueue(UA_Server *server, UA_DataSetWriter *dsw, UA_DataValue *value)  {
     if(dsw == NULL){
         UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER,
                  "The given DataSetWriter is NULL");
