@@ -1449,7 +1449,7 @@ UA_Server_addDataSetWriter(UA_Server *server,
 
     //connect PublishedDataSet with DataSetWriter
     newDataSetWriter->connectedDataSet = currentDataSetContext->identifier;
-    newDataSetWriter->config.dataSetName = currentDataSetContext->config.name; /*needed for loading in pubsub-config files*/
+    UA_String_copy(&currentDataSetContext->config.name, &newDataSetWriter->config.dataSetName); //needed for loading in pubsub-config files
     newDataSetWriter->linkedWriterGroup = wg->identifier;
     UA_PubSubManager_generateUniqueNodeId(server, &newDataSetWriter->identifier);
     if(writerIdentifier != NULL)
