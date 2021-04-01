@@ -937,7 +937,6 @@ addPublishedEventsAction(UA_Server *server,
         if(fieldFlags[j] == UA_DATASETFIELDFLAGS_PROMOTEDFIELD){
             dataSetFieldConfig.field.events.promotedField = UA_TRUE;
         }
-        dataSetFieldConfig.field.events.selectedField = selectedFields[j];
         UA_Server_addDataSetField(server, dataSetId, &dataSetFieldConfig, NULL);
     }
 
