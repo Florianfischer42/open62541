@@ -743,9 +743,11 @@ addPublishedEventsRepresentation(UA_Server *server, UA_PublishedDataSet *publish
                                      filterContext);
 
 #ifdef UA_ENABLE_PUBSUB_INFORMATIONMODEL_METHODS
+    /*TODO: implement ModifyFieldSelection (9.1.4.4.2)
     retVal |= UA_Server_addReference(server, publishedDataSet->identifier,
                                      UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
                                      UA_EXPANDEDNODEID_NUMERIC(0, UA_NS0ID_PUBLISHEDEVENTSTYPE_MODIFYFIELDSELECTION), true);
+    */
 #endif
     return retVal;
 }
