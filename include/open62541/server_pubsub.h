@@ -591,6 +591,7 @@ typedef struct {
     UA_String dataSetName;
     size_t dataSetWriterPropertiesSize;
     UA_KeyValuePair *dataSetWriterProperties;
+    size_t eventQueueMaxSize;
 } UA_DataSetWriterConfig;
 
 void UA_EXPORT

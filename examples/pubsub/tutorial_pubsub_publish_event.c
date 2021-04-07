@@ -161,6 +161,7 @@ addDataSetWriter(UA_Server *server) {
     dataSetWriterConfig.dataSetName = UA_STRING("Demo PDS PubSub Events"); //required to correctly save pubsub config files
     dataSetWriterConfig.dataSetWriterId = 62541;
     dataSetWriterConfig.keyFrameCount = 10;
+    dataSetWriterConfig.eventQueueMaxSize = 1024;
     UA_Server_addDataSetWriter(server, writerGroupIdent, publishedDataSetIdent,
                                &dataSetWriterConfig, &dataSetWriterIdent);
 }

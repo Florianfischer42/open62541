@@ -524,10 +524,10 @@ static const UA_NodeId isInFolderReferences[2] =
 #ifdef UA_ENABLE_PUBSUB_EVENTS
 static UA_StatusCode
 insertDataValueIntoDSWQueue(UA_Server *server, UA_DataSetWriter *dsw, UA_DataValue *value)  {
-    if(dsw->eventQueueEntries == dsw->eventQueueMaxSize){
+    if(dsw->eventQueueEntries == dsw->config.eventQueueMaxSize){
         UA_LOG_WARNING(&server->config.logger, UA_LOGCATEGORY_SERVER,
                      "EventQueueMaxSize reached %lu / %lu.",
-                       dsw->eventQueueEntries, dsw->eventQueueMaxSize);
+                       dsw->eventQueueEntries, dsw->config.eventQueueMaxSize);
 
         /* remove oldest entry to make space for new one*/
         EventQueueEntry *eventQueueEntry = SIMPLEQ_FIRST(&dsw->eventQueue);

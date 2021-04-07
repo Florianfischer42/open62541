@@ -1469,7 +1469,11 @@ UA_Server_addDataSetWriter(UA_Server *server,
 #ifdef UA_ENABLE_PUBSUB_EVENTS
     if(currentDataSetContext->config.publishedDataSetType == UA_PUBSUB_DATASET_PUBLISHEDEVENTS){
         SIMPLEQ_INIT(&newDataSetWriter->eventQueue); // only needs to be initalized if the linked publishedDataSet is for event
-        newDataSetWriter->eventQueueMaxSize = 1000; //test value
+        if(dataSetWriterConfig->eventQueueMaxSize > SIZE_MAX)
+            return UA_STATUSCODE_BADCONFIGURATIONERROR;
+        if(dataSetWriterConfig->eventQueueMaxSize == 0)
+            UA_LOG_WARNING(&server->config.logger, UA_LOGCATEGORY_SERVER,
+                         "Event queue max size is 0.");
         if(server->pubSubManager.publishedDataSetEventsSize == 0){ // init list if nothing was added before
             LIST_INIT(&server->pubSubManager.publishedDataSetEvents);
         }
